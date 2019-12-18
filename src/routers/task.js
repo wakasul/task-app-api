@@ -3,9 +3,30 @@ const router = new express.Router();
 const Task = require('../models/task');
 const auth = require('../middleware/auth');
 
-router.get('/tasks', auth, async ({user}, res) => {
+router.get('/tasks', auth, async ({user, query}, res) => {
+  const {completed, limit, skip, sortBy} = query;
+  const match = {};
+  const sort = {};
+
+  if (completed !== undefined) {
+    match.completed = completed === 'true';
+  }
+
+  if (sortBy) {
+    const parts = sortBy.split(':');
+    sort[parts[0]] = parts[1] === 'desc' ? -1 : 1;
+  }
+
   try {
-    await user.populate('tasks').execPopulate();
+    await user.populate({
+      path: 'tasks',
+      match,
+      options: {
+        limit: parseInt(limit),
+        skip: parseInt(skip),
+        sort,
+      },
+    }).execPopulate();
     res.send(user.tasks);
   } catch (error) {
     res.status(500).send(error);
@@ -66,7 +87,6 @@ router.patch('/tasks/:id', auth, async ({params, body, user}, res) => {
     }
 
     updates.forEach((key) => task[key] = body[key]);
-    console.log(task);
     await task.save();
 
     res.send(task);
